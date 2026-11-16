@@ -5,6 +5,7 @@ const path = require('path');
 const fetch = require('node-fetch');
 const cron = require('node-cron');
 const multer = require('multer');
+const { randomUUID } = require('crypto');
 const { google } = require('googleapis');
 
 const app = express();
@@ -552,11 +553,11 @@ function initDefaults() {
   if (!fs.existsSync(FILES.people)) {
     writeJSON(FILES.people, {
       people: [
-        { id: 'parent1', name: 'Parent 1', color: '#166534' },
-        { id: 'parent2', name: 'Parent 2', color: '#1e3a5f' },
-        { id: 'kid1',    name: 'Kid 1',    color: '#db2777' },
-        { id: 'kid2',    name: 'Kid 2',    color: '#ea580c' },
-        { id: 'family',  name: 'Family',   color: '#166534' },
+        { id: 'parent1', name: 'Parent 1', color: '#166534', type: 'adult' },
+        { id: 'parent2', name: 'Parent 2', color: '#1e3a5f', type: 'adult' },
+        { id: 'kid1',    name: 'Kid 1',    color: '#db2777', type: 'child' },
+        { id: 'kid2',    name: 'Kid 2',    color: '#ea580c', type: 'child' },
+        { id: 'family',  name: 'Family',   color: '#166534', type: 'group' },
       ]
     });
   }
@@ -1646,7 +1647,7 @@ app.get('/api/chores', (req, res) => {
   const data = readJSON(FILES.chores, { people: [] });
   const peopleData = readJSON(FILES.people, { people: [] });
   const metaById = {};
-  (peopleData.people || []).forEach(p => { metaById[p.id] = { name: p.name, color: p.color, photoUrl: personPhotoUrl(p) }; });
+  (peopleData.people || []).forEach(p => { metaById[p.id] = { name: p.name, color: p.color, type: p.type || (p.id === 'family' ? 'group' : (p.id.startsWith('kid') ? 'child' : 'adult')), photoUrl: personPhotoUrl(p) }; });
   const people = (data.people || []).map(p => metaById[p.id] ? { ...p, ...metaById[p.id] } : p);
   res.json({ ...data, people });
 });
@@ -1926,17 +1927,39 @@ function personPhotoUrl(person) {
 
 app.get('/api/people', (req, res) => {
   const data = readJSON(FILES.people, { people: [] });
-  const people = data.people.map(p => ({ ...p, photoUrl: personPhotoUrl(p) }));
+  const people = data.people.map(p => ({ ...p, type: p.type || (p.id === 'family' ? 'group' : (p.id.startsWith('kid') ? 'child' : 'adult')), photoUrl: personPhotoUrl(p) }));
   res.json({ people });
 });
 
+app.post('/api/people/add', (req, res) => {
+  const { name, type, color } = req.body;
+  const cleanName = String(name || '').trim();
+  if (!cleanName) return res.status(400).json({ error: 'Name is required' });
+  if (!['child', 'adult'].includes(type)) return res.status(400).json({ error: 'Type must be child or adult' });
+  const peopleData = readJSON(FILES.people, { people: [] });
+  const id = `person-${randomUUID()}`;
+  const person = { id, name: cleanName, color: /^#[0-9a-fA-F]{6}$/.test(color || '') ? color : '#64748b', type };
+  peopleData.people.push(person);
+  writeJSON(FILES.people, peopleData);
+
+  // Keep the chores store in sync so new family members immediately appear
+  // on the Chores page and can receive chores/stars like existing members.
+  const choresData = readJSON(FILES.chores, { people: [], upForGrabs: [] });
+  choresData.people = choresData.people || [];
+  choresData.people.push({ id, name: cleanName, color: person.color, totalStars: 0, rewardGoal: { name: 'Choose a reward', stars: 20 }, rewards: [], chores: [] });
+  writeJSON(FILES.chores, choresData);
+
+  res.json({ ok: true, person: { ...person, photoUrl: null } });
+});
+
 app.post('/api/people/update', (req, res) => {
-  const { id, name, color } = req.body;
+  const { id, name, color, type } = req.body;
   const data = readJSON(FILES.people, { people: [] });
   const person = data.people.find(p => p.id === id);
   if (!person) return res.status(404).json({ error: 'Person not found' });
   if (name !== undefined) person.name = name;
   if (color !== undefined) person.color = color;
+  if (type !== undefined && ['child', 'adult'].includes(type) && person.id !== 'family') person.type = type;
   writeJSON(FILES.people, data);
   res.json({ ok: true, person: { ...person, photoUrl: personPhotoUrl(person) } });
 });
