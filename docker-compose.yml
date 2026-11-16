@@ -1,4 +1,5 @@
-version: '3.8'
+
+version: "3.8"
 
 services:
   backend:
@@ -11,17 +12,17 @@ services:
       - ./data:/app/data
     environment:
       - NODE_ENV=production
-      - TZ=${TZ:-America/New_York}
+      - TZ=America/Phoenix
       - CALDAV_URL=${CALDAV_URL:-}
       - CALDAV_USERNAME=${CALDAV_USERNAME:-}
       - CALDAV_PASSWORD=${CALDAV_PASSWORD:-}
-      - WEATHER_LAT=${WEATHER_LAT:-40.7128}
-      - WEATHER_LON=${WEATHER_LON:--74.0060}
-      - WEATHER_LOCATION_LABEL=${WEATHER_LOCATION_LABEL:-}
+      - WEATHER_LAT=33.63
+      - WEATHER_LON=-112.37
+      - WEATHER_LOCATION_LABEL=Surprise, AZ
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-}
-      - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:3000/}
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://192.168.1.11:3000/}
       - SPOONACULAR_API_KEY=${SPOONACULAR_API_KEY:-}
       - TIDE_BEACHES=${TIDE_BEACHES:-}
       - MEALIE_URL=${MEALIE_URL:-}
@@ -36,6 +37,26 @@ services:
       - "3000:80"
     depends_on:
       - backend
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: family-dashboard-tailscale
+    hostname: family-dashboard
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SERVE_CONFIG=/config/serve.json
+      - TS_USERSPACE=true
+      - TS_AUTH_ONCE=true
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./tailscale/serve.json:/config/serve.json:ro
+    depends_on:
+      - frontend
+
+volumes:
+  tailscale-state:
 
 networks:
   default:
