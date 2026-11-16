@@ -85,7 +85,8 @@ export const api = {
   toggleShoppingItem: (id) => post('/shopping-list/toggle', { id }),
   clearCheckedItems: () => post('/shopping-list/clear'),
   people: () => get('/people'),
-  updatePerson: (id, name, color) => post('/people/update', { id, name, color }),
+  updatePerson: (id, name, color, type) => post('/people/update', { id, name, color, type }),
+  addPerson: (name, type, color) => post('/people/add', { name, type, color }),
   uploadPersonPhoto: async (id, blob) => {
     const formData = new FormData();
     formData.append('photo', blob, 'avatar.png');
