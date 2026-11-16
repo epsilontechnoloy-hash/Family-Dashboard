@@ -4,7 +4,6 @@ import { useScreenSize } from '../hooks/useScreenSize';
 import Avatar from './Avatar';
 import Icon from './Icon';
 
-const STAR_REWARD_PEOPLE = ['kid1', 'kid2'];
 const CONFETTI_EMOJI = ['🎉', '✨', '⭐', '🎊'];
 const GRABS_COLOR = '#1e2533';
 
@@ -298,7 +297,7 @@ export default function Chores({ compact = false }) {
         const total = person.chores.length;
         const pct = total ? (done / total) * 100 : 0;
         const color = personColors[person.id] || person.color;
-        const isStarPerson = STAR_REWARD_PEOPLE.includes(person.id);
+        const isStarPerson = person.type === 'child' || person.id.startsWith('kid');
         const totalStars = person.totalStars || 0;
 
         return (

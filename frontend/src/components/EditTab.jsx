@@ -450,7 +450,7 @@ function GeneralEditor({ isMobile, onGeneralSettingsSaved }) {
 // ── Chores Editor ────────────────────────────────────────────────────────────
 
 const RESET_OPTIONS = ['daily', 'weekly', 'manual'];
-const STAR_REWARD_PEOPLE = ['kid1', 'kid2'];
+const isChildPerson = person => person.type === 'child' || person.id.startsWith('kid');
 
 function ChoresEditor({ isMobile }) {
   const [data, setData] = useState(null);
@@ -785,7 +785,7 @@ function ChoresEditor({ isMobile }) {
       <div style={{ ...s.grid, ...(isMobile ? s.gridMobile : {}) }}>
       {data.people.map(person => {
         const draft = getDraft(person.id);
-        const showReward = STAR_REWARD_PEOPLE.includes(person.id);
+        const showReward = isChildPerson(person);
         const rewardDraft = getRewardDraft(person);
         return (
           <div key={person.id} style={{ ...s.card, ...(person.hidden ? s.cardHidden : {}) }}>
@@ -1899,6 +1899,10 @@ function PeopleEditor({ isMobile }) {
   const [savingId, setSavingId] = useState(null);
   const [croppingId, setCroppingId] = useState(null);
   const [photoBusyId, setPhotoBusyId] = useState(null);
+  const [newName, setNewName] = useState('');
+  const [newType, setNewType] = useState('child');
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState('');
 
   useEffect(() => {
     refresh();
@@ -1908,7 +1912,7 @@ function PeopleEditor({ isMobile }) {
     api.people().then(res => {
       setPeople(res.people);
       const init = {};
-      res.people.forEach(p => { init[p.id] = { name: p.name, color: p.color }; });
+      res.people.forEach(p => { init[p.id] = { name: p.name, color: p.color, type: p.type || (p.id.startsWith('kid') ? 'child' : 'adult') }; });
       setDrafts(init);
     }).catch(console.error);
   }
@@ -1921,8 +1925,8 @@ function PeopleEditor({ isMobile }) {
     const draft = drafts[id];
     setSavingId(id);
     try {
-      await api.updatePerson(id, draft.name, draft.color);
-      setPeople(prev => prev.map(p => p.id === id ? { ...p, name: draft.name, color: draft.color } : p));
+      await api.updatePerson(id, draft.name, draft.color, draft.type);
+      setPeople(prev => prev.map(p => p.id === id ? { ...p, name: draft.name, color: draft.color, type: draft.type } : p));
     } finally {
       setSavingId(null);
     }
@@ -1944,6 +1948,20 @@ function PeopleEditor({ isMobile }) {
     }
   }
 
+  async function addPerson() {
+    const name = newName.trim();
+    if (!name) { setAddError('Enter a name first.'); return; }
+    setAdding(true); setAddError('');
+    try {
+      const res = await api.addPerson(name, newType, newType === 'child' ? '#0d9488' : '#64748b');
+      const person = res.person;
+      setPeople(prev => [...prev, person]);
+      setDrafts(prev => ({ ...prev, [person.id]: { name: person.name, color: person.color, type: person.type } }));
+      setNewName('');
+    } catch (err) { setAddError(err.message || 'Could not add family member.'); }
+    finally { setAdding(false); }
+  }
+
   if (!people) return <div style={s.empty}>Loading people…</div>;
 
   const croppingPerson = people.find(p => p.id === croppingId);
@@ -1963,6 +1981,19 @@ function PeopleEditor({ isMobile }) {
                 onChange={e => setDraft(person.id, { name: e.target.value })}
               />
             </div>
+            {person.id !== 'family' && (
+              <div style={{ ...s.addRow, ...(isMobile ? s.addRowMobile : {}) }}>
+                <label style={{ ...s.rowName, minWidth: 70 }}>Member type</label>
+                <select
+                  style={{ ...s.select, ...(isMobile ? s.fullWidthInput : {}) }}
+                  value={draft.type || 'adult'}
+                  onChange={e => setDraft(person.id, { type: e.target.value })}
+                >
+                  <option value="child">Child — included in Homeschool</option>
+                  <option value="adult">Adult — excluded from Homeschool</option>
+                </select>
+              </div>
+            )}
             <div style={{ ...s.addRow, ...(isMobile ? s.addRowMobile : {}) }}>
               <button style={s.cancelBtn} onClick={() => setCroppingId(person.id)}>
                 {person.photoUrl ? 'Change Photo' : 'Add Photo'}
@@ -1995,6 +2026,19 @@ function PeopleEditor({ isMobile }) {
           </div>
         );
       })}
+
+      <div style={{ ...s.card, ...(isMobile ? s.gridMobile : {}) }}>
+        <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 12 }}>Add Family Member</div>
+        <div style={{ ...s.addRow, ...(isMobile ? s.addRowMobile : {}) }}>
+          <input style={{ ...s.nameInput, ...(isMobile ? s.fullWidthInput : {}) }} value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name" onKeyDown={e => { if (e.key === 'Enter') addPerson(); }} />
+          <select style={{ ...s.select, ...(isMobile ? s.fullWidthInput : {}) }} value={newType} onChange={e => setNewType(e.target.value)}>
+            <option value="child">Child</option>
+            <option value="adult">Adult</option>
+          </select>
+          <button style={s.addBtn} onClick={addPerson} disabled={adding}>{adding ? 'Adding…' : 'Add Member'}</button>
+        </div>
+        {addError && <div style={s.errorText}>{addError}</div>}
+      </div>
 
       {croppingPerson && (
         <AvatarCropModal

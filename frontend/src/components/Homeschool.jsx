@@ -13,12 +13,9 @@ const DAYS = [
   { key: 'Fri', name: 'Friday', offset: 5, color: 'var(--pink)' },
 ];
 
-// Only the kids get homeschool tabs — filter by id first, falling back to
-// name in case ids ever drift from the expected "kid1"/"kid2".
+// Homeschool tabs are shown for every family member designated as a child.
 function filterHomeschoolPeople(people) {
-  const byId = people.filter(p => p.id === 'kid1' || p.id === 'kid2');
-  if (byId.length > 0) return byId;
-  return people.filter(p => p.name === 'Kid 1' || p.name === 'Kid 2');
+  return people.filter(p => (p.type || (p.id.startsWith('kid') ? 'child' : 'adult')) === 'child');
 }
 
 // Section groups rendered top-to-bottom within each day column. Only groups
