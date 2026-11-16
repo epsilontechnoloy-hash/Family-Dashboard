@@ -633,6 +633,17 @@ function ChoresEditor({ isMobile }) {
     setRewardItemDrafts(prev => ({ ...prev, [personId]: { name: '', emoji: '', starsRequired: 5 } }));
   }
 
+  async function saveRewardEmoji(personId, rewardId, emoji) {
+    await api.updateRewardEmoji(personId, rewardId, emoji);
+    setData(prev => ({
+      ...prev,
+      people: prev.people.map(p => p.id !== personId ? p : {
+        ...p,
+        rewards: (p.rewards || []).map(r => r.id !== rewardId ? r : { ...r, emoji })
+      })
+    }));
+  }
+
   async function deleteRewardItem(personId, rewardId) {
     await api.deleteReward(personId, rewardId);
     setData(prev => ({
@@ -995,7 +1006,10 @@ function ChoresEditor({ isMobile }) {
                 <div style={s.list}>
                   {(person.rewards || []).map(reward => (
                     <div key={reward.id} style={s.row}>
-                      <span style={s.rowEmoji}>{reward.emoji}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <span style={s.rowEmoji}>{reward.emoji}</span>
+                        <EmojiPickerButton onSelect={emoji => saveRewardEmoji(person.id, reward.id, emoji)} label="Change reward emoji" />
+                      </div>
                       <span style={s.rowName}>{reward.name}</span>
                       <span style={s.rowReset}>{reward.starsRequired} ⭐</span>
                       <button style={s.trashBtn} onClick={() => deleteRewardItem(person.id, reward.id)} title="Delete reward">
@@ -1007,13 +1021,16 @@ function ChoresEditor({ isMobile }) {
                 </div>
 
                 <div style={{ ...s.addRow, ...(isMobile ? s.addRowMobile : {}) }}>
-                  <input
-                    style={{ ...s.emojiInput, ...(isMobile ? s.fullWidthInput : {}) }}
-                    type="text"
-                    placeholder="🎁"
-                    value={getRewardItemDraft(person.id).emoji}
-                    onChange={e => setRewardItemDraft(person.id, { emoji: e.target.value })}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <input
+                      style={s.emojiInput}
+                      type="text"
+                      placeholder="🎁"
+                      value={getRewardItemDraft(person.id).emoji}
+                      onChange={e => setRewardItemDraft(person.id, { emoji: e.target.value })}
+                    />
+                    <EmojiPickerButton onSelect={emoji => setRewardItemDraft(person.id, { emoji })} label="Choose reward emoji" />
+                  </div>
                   <input
                     style={s.nameInput}
                     type="text"
