@@ -7,7 +7,7 @@ services:
     container_name: family-dashboard-backend
     restart: unless-stopped
     ports:
-      - "3003:3001"
+      - "3004:3001"
     volumes:
       - ./data:/app/data
     environment:
@@ -34,7 +34,7 @@ services:
     container_name: family-dashboard-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3003:80"
     depends_on:
       - backend
 
