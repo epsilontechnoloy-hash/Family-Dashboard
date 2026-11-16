@@ -56,6 +56,7 @@ export const api = {
   setUpForGrabsStars: (choreId, stars) => post('/chores/up-for-grabs/set-stars', { choreId, stars }),
   redeemReward: (personId, rewardId) => post('/chores/redeem', { personId, rewardId }),
   addReward: (personId, name, starsRequired, emoji) => post('/chores/rewards/add', { personId, name, starsRequired, emoji }),
+  updateRewardEmoji: (personId, rewardId, emoji) => post('/chores/rewards/emoji', { personId, rewardId, emoji }),
   deleteReward: (personId, rewardId) => del(`/chores/rewards/${personId}/${rewardId}`),
   meals: (start, end) => get(start && end ? `/meals?start=${start}&end=${end}` : '/meals'),
   updateMeal: (date, meals) => post('/meals/update', { date, meals }),
