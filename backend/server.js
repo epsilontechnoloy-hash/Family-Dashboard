@@ -1869,6 +1869,18 @@ app.post('/api/chores/rewards/add', (req, res) => {
   res.json({ ok: true, reward });
 });
 
+app.post('/api/chores/rewards/emoji', (req, res) => {
+  const { personId, rewardId, emoji } = req.body;
+  const data = readJSON(FILES.chores, { people: [] });
+  const person = data.people.find(p => p.id === personId);
+  if (!person) return res.status(404).json({ error: 'Person not found' });
+  const reward = (person.rewards || []).find(r => r.id === rewardId);
+  if (!reward) return res.status(404).json({ error: 'Reward not found' });
+  reward.emoji = emoji || '🎁';
+  writeJSON(FILES.chores, data);
+  res.json({ ok: true, reward });
+});
+
 app.delete('/api/chores/rewards/:personId/:rewardId', (req, res) => {
   const data = readJSON(FILES.chores, { people: [] });
   const person = data.people.find(p => p.id === req.params.personId);
