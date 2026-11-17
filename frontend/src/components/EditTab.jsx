@@ -450,9 +450,9 @@ function GeneralEditor({ isMobile, onGeneralSettingsSaved }) {
 // Expanded, dependency-free emoji picker used by chore and reward emoji fields.
 const CHORE_EMOJIS = [
   // Home, cleaning & laundry
-  '🛏️','🪑','🛋️','🧹','🧺','🧽','🧼','🪣','🧴','🧻','🗑️','♻️','🧯','🪠','🪟','🪞','🧤','🧦','👕','👖','👗','👟','🥿','🧥',
+  '🛏️','🪑','🛋️','🧹','🧺','🧽','🧼','💧','🧴','🧻','🗑️','♻️','🧯','🚽','🏠','🦷','🧤','🧦','👕','👖','👗','👟','🥿','🧥',
   // Bathroom & personal care
-  '🪥','🦷','🧴','🧖','🛁','🚿','🧼','🪒','💈','🧻','🧺',
+  '🦷','🦷','🧴','🧖','🛁','🚿','🧼','🪒','💈','🧻','🧺',
   // Kitchen & food
   '🍽️','🍴','🥄','🥣','🥢','🍳','🫖','☕','🧃','🥛','🍎','🍌','🍓','🍇','🍉','🥕','🥦','🌽','🥔','🍞','🥪','🧀','🍪','🧁','🍕','🍿','🛒',
   // Pets & animals
