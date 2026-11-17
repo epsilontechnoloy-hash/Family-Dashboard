@@ -14,6 +14,12 @@ const CHORE_PERIODS = [
 const chorePeriods = chore => Array.isArray(chore.periods) && chore.periods.length ? chore.periods : ['morning'];
 const periodDone = (chore, period) => chore.periodDone ? !!chore.periodDone[period] : !!chore.done && period === 'morning';
 
+// Match the Chore Chart's section order on compact/Home views while keeping
+// the existing chore order within each period.
+const sortChoreOccurrences = occurrences => [...occurrences].sort(
+  (a, b) => CHORE_PERIODS.findIndex(p => p.id === a.period) - CHORE_PERIODS.findIndex(p => p.id === b.period)
+);
+
 function timeAgo(iso) {
   if (!iso) return '';
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -181,7 +187,9 @@ export default function Chores({ compact = false }) {
         {visiblePeople.length === 0 && <div style={s.empty}>No one to show here yet.</div>}
         {visiblePeople.map(person => {
           const color = personColors[person.id] || person.color;
-          const compactOccurrences = person.chores.flatMap(chore => chorePeriods(chore).map(period => ({ chore, period })));
+          const compactOccurrences = sortChoreOccurrences(
+            person.chores.flatMap(chore => chorePeriods(chore).map(period => ({ chore, period })))
+          );
           const total = compactOccurrences.length;
           const done = compactOccurrences.filter(({ chore, period }) => periodDone(chore, period)).length;
           const pct = total ? (done / total) * 100 : 0;
@@ -206,7 +214,7 @@ export default function Chores({ compact = false }) {
                   {person.chores.length === 0 ? (
                     <div style={s.compactDone}>No chores yet</div>
                   ) : (
-                    person.chores.flatMap(chore => chorePeriods(chore).map(period => ({ chore, period }))).slice(0, 12).map(({ chore, period }) => {
+                    compactOccurrences.slice(0, 12).map(({ chore, period }) => {
                       const done = periodDone(chore, period);
                       const label = CHORE_PERIODS.find(p => p.id === period)?.label || 'Morning';
                       return (
@@ -219,7 +227,7 @@ export default function Chores({ compact = false }) {
                       );
                     })
                   )}
-                  {person.chores.flatMap(chore => chorePeriods(chore)).length > 12 && <div style={s.compactMore}>+{person.chores.flatMap(chore => chorePeriods(chore)).length - 12} more</div>}
+                  {compactOccurrences.length > 12 && <div style={s.compactMore}>+{compactOccurrences.length - 12} more</div>}
                 </div>
               </div>
             </div>
