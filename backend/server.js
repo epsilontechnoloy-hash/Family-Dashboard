@@ -900,13 +900,16 @@ function resetChores() {
 
   for (const person of data.people) {
     for (const chore of person.chores) {
-      if (!chore.done || !chore.doneAt) continue;
-      const doneDate = new Date(chore.doneAt);
+      const completionDates = Object.values(chore.periodDoneAt || {}).filter(Boolean);
+      const completionStamp = completionDates.length ? completionDates.sort().at(-1) : chore.doneAt;
+      if ((!chore.done && !completionStamp) || !completionStamp) continue;
+      const doneDate = new Date(completionStamp);
       const daysPassed = calendarDaysBetween(doneDate, now);
-      if (chore.reset === 'daily' && daysPassed >= 1) {
-        chore.done = false; chore.doneAt = null; changed = true; resetCount++;
-      } else if (chore.reset === 'weekly' && daysPassed >= 7) {
-        chore.done = false; chore.doneAt = null; changed = true; resetCount++;
+      if ((chore.reset === 'daily' && daysPassed >= 1) || (chore.reset === 'weekly' && daysPassed >= 7)) {
+        chore.done = false; chore.doneAt = null;
+        if (chore.periodDone) chore.periodDone = {};
+        if (chore.periodDoneAt) chore.periodDoneAt = {};
+        changed = true; resetCount++;
       }
     }
   }
@@ -969,6 +972,16 @@ function migrateChoreRewards() {
     if (!person.rewards) { person.rewards = []; changed = true; }
     for (const chore of person.chores) {
       if (chore.stars === undefined) { chore.stars = 1; changed = true; }
+      if (!Array.isArray(chore.periods) || chore.periods.length === 0) { chore.periods = ['morning']; changed = true; }
+      if (!chore.periodDone || typeof chore.periodDone !== 'object') {
+        chore.periodDone = chore.done ? { morning: true } : {};
+        changed = true;
+      }
+      if (!chore.periodDoneAt || typeof chore.periodDoneAt !== 'object') { chore.periodDoneAt = {}; changed = true; }
+      if (chore.done && chore.doneAt && chore.periodDone.morning && !chore.periodDoneAt.morning) {
+        chore.periodDoneAt.morning = chore.doneAt;
+        changed = true;
+      }
     }
   }
 
@@ -1653,25 +1666,37 @@ app.get('/api/chores', (req, res) => {
 });
 
 app.post('/api/chores/toggle', (req, res) => {
-  const { personId, choreId } = req.body;
+  const { personId, choreId, period = 'morning' } = req.body;
+  const validPeriods = ['morning', 'afternoon', 'nightly'];
+  if (!validPeriods.includes(period)) return res.status(400).json({ error: 'Invalid chore period' });
   const data = readJSON(FILES.chores, { people: [] });
   const person = data.people.find(p => p.id === personId);
   if (!person) return res.status(404).json({ error: 'Person not found' });
   const chore = person.chores.find(c => c.id === choreId);
   if (!chore) return res.status(404).json({ error: 'Chore not found' });
-  chore.done = !chore.done;
+  const periods = Array.isArray(chore.periods) && chore.periods.length
+    ? chore.periods : ['morning'];
+  chore.periods = periods;
+  if (!chore.periodDone || typeof chore.periodDone !== 'object') {
+    chore.periodDone = {};
+    // Preserve a legacy once-a-day completion as a completed morning occurrence.
+    if (chore.done) chore.periodDone.morning = true;
+  }
+  const wasDone = !!chore.periodDone[period];
+  chore.periodDone[period] = !wasDone;
+  chore.periodDoneAt = chore.periodDoneAt || {};
+  chore.periodDoneAt[period] = wasDone ? null : new Date().toISOString();
+  chore.done = periods.every(p => !!chore.periodDone[p]);
   chore.doneAt = chore.done ? new Date().toISOString() : null;
 
   const stars = chore.stars || 1;
   if (person.totalStars === undefined) person.totalStars = 0;
-  if (chore.done) {
-    person.totalStars += stars;
-  } else {
-    person.totalStars = Math.max(0, person.totalStars - stars);
-  }
+  person.totalStars = wasDone
+    ? Math.max(0, person.totalStars - stars)
+    : person.totalStars + stars;
 
   writeJSON(FILES.chores, data);
-  res.json({ ok: true, done: chore.done, totalStars: person.totalStars });
+  res.json({ ok: true, done: !!chore.periodDone[period], periodDone: chore.periodDone, choreDone: chore.done, totalStars: person.totalStars });
 });
 
 app.post('/api/chores/set-person-hidden', (req, res) => {
@@ -1685,18 +1710,18 @@ app.post('/api/chores/set-person-hidden', (req, res) => {
 });
 
 app.post('/api/chores/add', (req, res) => {
-  const { personId, name, emoji, reset } = req.body;
+  const { personId, name, emoji, reset, periods } = req.body;
   const data = readJSON(FILES.chores, { people: [] });
   const person = data.people.find(p => p.id === personId);
   if (!person) return res.status(404).json({ error: 'Person not found' });
-  const newChore = { id: `c${Date.now()}`, name, emoji: emoji || '✅', reset: reset || 'weekly', done: false, doneAt: null, stars: 1 };
+  const newChore = { id: `c${Date.now()}`, name, emoji: emoji || '✅', reset: reset || 'weekly', periods: Array.isArray(periods) && periods.length ? periods : ['morning'], periodDone: {}, periodDoneAt: {}, done: false, doneAt: null, stars: 1 };
   person.chores.push(newChore);
   writeJSON(FILES.chores, data);
   res.json({ ok: true, chore: newChore });
 });
 
 app.post('/api/chores/edit', (req, res) => {
-  const { personId, choreId, name, emoji, reset } = req.body;
+  const { personId, choreId, name, emoji, reset, periods } = req.body;
   const data = readJSON(FILES.chores, { people: [] });
   const person = data.people.find(p => p.id === personId);
   if (!person) return res.status(404).json({ error: 'Person not found' });
@@ -1705,6 +1730,13 @@ app.post('/api/chores/edit', (req, res) => {
   if (name !== undefined) chore.name = name;
   if (emoji !== undefined) chore.emoji = emoji;
   if (reset !== undefined) chore.reset = reset;
+  if (periods !== undefined) {
+    chore.periods = Array.isArray(periods) && periods.length ? periods : ['morning'];
+    chore.periodDone = Object.fromEntries(chore.periods.filter(p => chore.periodDone?.[p]).map(p => [p, true]));
+    chore.periodDoneAt = Object.fromEntries(chore.periods.filter(p => chore.periodDoneAt?.[p]).map(p => [p, chore.periodDoneAt[p]]));
+    chore.done = chore.periods.every(p => !!chore.periodDone[p]);
+    chore.doneAt = chore.done ? new Date().toISOString() : null;
+  }
   writeJSON(FILES.chores, data);
   res.json({ ok: true, chore });
 });

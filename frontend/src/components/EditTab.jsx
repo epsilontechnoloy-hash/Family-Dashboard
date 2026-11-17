@@ -485,6 +485,7 @@ function EmojiPickerButton({ onSelect, label = 'Choose emoji' }) {
 // ── Chores Editor ────────────────────────────────────────────────────────────
 
 const RESET_OPTIONS = ['daily', 'weekly', 'manual'];
+const CHORE_PERIOD_OPTIONS = [{ id: 'morning', label: '☀️ Morning' }, { id: 'afternoon', label: '🌤️ Afternoon' }, { id: 'nightly', label: '🌙 Nightly' }];
 const isChildPerson = person => person.type === 'child' || person.id.startsWith('kid');
 
 function ChoresEditor({ isMobile }) {
@@ -551,7 +552,7 @@ function ChoresEditor({ isMobile }) {
   }
 
   function getDraft(personId) {
-    return drafts[personId] || { name: '', emoji: '', reset: 'weekly' };
+    return drafts[personId] || { name: '', emoji: '', reset: 'weekly', periods: ['morning'] };
   }
 
   function getAdjustDraft(personId) {
@@ -655,12 +656,12 @@ function ChoresEditor({ isMobile }) {
   async function addChore(personId) {
     const draft = getDraft(personId);
     if (!draft.name.trim()) return;
-    const res = await api.addChore(personId, draft.name.trim(), draft.emoji.trim(), draft.reset);
+    const res = await api.addChore(personId, draft.name.trim(), draft.emoji.trim(), draft.reset, draft.periods);
     setData(prev => ({
       ...prev,
       people: prev.people.map(p => p.id !== personId ? p : { ...p, chores: [...p.chores, res.chore] })
     }));
-    setDrafts(prev => ({ ...prev, [personId]: { name: '', emoji: '', reset: 'weekly' } }));
+    setDrafts(prev => ({ ...prev, [personId]: { name: '', emoji: '', reset: 'weekly', periods: ['morning'] } }));
   }
 
   async function deleteChore(personId, choreId) {
@@ -683,6 +684,20 @@ function ChoresEditor({ isMobile }) {
 
   async function saveChoreEdit(personId, choreId, patch) {
     await api.editChore(personId, choreId, patch);
+  }
+
+  function toggleDraftPeriod(personId, period) {
+    const draft = getDraft(personId);
+    const periods = draft.periods.includes(period) ? draft.periods.filter(p => p !== period) : [...draft.periods, period];
+    setDraft(personId, { periods: periods.length ? periods : [period] });
+  }
+
+  function toggleChorePeriod(personId, chore, period) {
+    const current = Array.isArray(chore.periods) && chore.periods.length ? chore.periods : ['morning'];
+    const periods = current.includes(period) ? current.filter(p => p !== period) : [...current, period];
+    const safePeriods = periods.length ? periods : [period];
+    updateChoreField(personId, chore.id, { periods: safePeriods });
+    saveChoreEdit(personId, chore.id, { periods: safePeriods });
   }
 
   async function setStars(personId, choreId, stars) {
@@ -935,6 +950,14 @@ function ChoresEditor({ isMobile }) {
                         🗑️
                       </button>
                     </div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '5px 8px 7px 34px' }}>
+                      {CHORE_PERIOD_OPTIONS.map(period => {
+                        const selected = (Array.isArray(chore.periods) && chore.periods.length ? chore.periods : ['morning']).includes(period.id);
+                        return <label key={period.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-2)', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={selected} onChange={() => toggleChorePeriod(person.id, chore, period.id)} />{period.label}
+                        </label>;
+                      })}
+                    </div>
                   </div>
                 );
               })}
@@ -967,6 +990,11 @@ function ChoresEditor({ isMobile }) {
               >
                 {RESET_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {CHORE_PERIOD_OPTIONS.map(period => <label key={period.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-2)' }}>
+                  <input type="checkbox" checked={draft.periods.includes(period.id)} onChange={() => toggleDraftPeriod(person.id, period.id)} />{period.label}
+                </label>)}
+              </div>
               <button style={{ ...s.addBtn, background: person.color }} onClick={() => addChore(person.id)}>
                 Add
               </button>

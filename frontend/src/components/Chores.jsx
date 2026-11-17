@@ -6,6 +6,13 @@ import Icon from './Icon';
 
 const CONFETTI_EMOJI = ['🎉', '✨', '⭐', '🎊'];
 const GRABS_COLOR = '#1e2533';
+const CHORE_PERIODS = [
+  { id: 'morning', label: 'Morning', emoji: '☀️' },
+  { id: 'afternoon', label: 'Afternoon', emoji: '🌤️' },
+  { id: 'nightly', label: 'Nightly', emoji: '🌙' },
+];
+const chorePeriods = chore => Array.isArray(chore.periods) && chore.periods.length ? chore.periods : ['morning'];
+const periodDone = (chore, period) => chore.periodDone ? !!chore.periodDone[period] : !!chore.done && period === 'morning';
 
 function timeAgo(iso) {
   if (!iso) return '';
@@ -110,21 +117,21 @@ export default function Chores({ compact = false }) {
     }, 900);
   }
 
-  async function toggle(person, chore) {
-    const wasDone = chore.done;
+  async function toggle(person, chore, period) {
+    const wasDone = periodDone(chore, period);
     const stars = chore.stars || 1;
-    await api.toggleChore(person.id, chore.id);
+    const res = await api.toggleChore(person.id, chore.id, period);
     setData(prev => ({
       ...prev,
       people: prev.people.map(p => p.id !== person.id ? p : {
-        ...p,
-        totalStars: wasDone
-          ? Math.max(0, (p.totalStars || 0) - stars)
-          : (p.totalStars || 0) + stars,
-        chores: p.chores.map(c => c.id !== chore.id ? c : { ...c, done: !c.done })
+        ...p, totalStars: res.totalStars,
+        chores: p.chores.map(c => c.id !== chore.id ? c : {
+          ...c, periodDone: res.periodDone, done: res.choreDone,
+          periodDoneAt: { ...(c.periodDoneAt || {}), [period]: res.periodDone[period] ? new Date().toISOString() : null },
+        })
       })
     }));
-    if (!wasDone) triggerStarPop(chore.id);
+    if (!wasDone) triggerStarPop(`${chore.id}-${period}`);
   }
 
   async function claimChore(chore, person) {
@@ -174,8 +181,9 @@ export default function Chores({ compact = false }) {
         {visiblePeople.length === 0 && <div style={s.empty}>No one to show here yet.</div>}
         {visiblePeople.map(person => {
           const color = personColors[person.id] || person.color;
-          const total = person.chores.length;
-          const done = person.chores.filter(c => c.done).length;
+          const compactOccurrences = person.chores.flatMap(chore => chorePeriods(chore).map(period => ({ chore, period })));
+          const total = compactOccurrences.length;
+          const done = compactOccurrences.filter(({ chore, period }) => periodDone(chore, period)).length;
           const pct = total ? (done / total) * 100 : 0;
           const collapsed = collapsedCards.has(person.id);
           return (
@@ -193,23 +201,25 @@ export default function Chores({ compact = false }) {
                   <Icon name="chevron-right" size={16} />
                 </div>
               </div>
-              <div style={{ ...s.compactBodyOuter, maxHeight: collapsed ? 0 : 400 }}>
+              <div style={{ ...s.compactBodyOuter, maxHeight: collapsed ? 0 : 700 }}>
                 <div style={s.compactCardBody}>
                   {person.chores.length === 0 ? (
                     <div style={s.compactDone}>No chores yet</div>
                   ) : (
-                    person.chores.slice(0, 4).map(chore => (
-                      <div key={chore.id} style={s.compactStepRow} onClick={() => toggle(person, chore)}>
-                        <div style={{ ...s.compactStepCircle, ...(chore.done ? s.compactStepCircleDone : {}) }}>
-                          {chore.done && <Icon name="check" size={13} />}
+                    person.chores.flatMap(chore => chorePeriods(chore).map(period => ({ chore, period }))).slice(0, 12).map(({ chore, period }) => {
+                      const done = periodDone(chore, period);
+                      const label = CHORE_PERIODS.find(p => p.id === period)?.label || 'Morning';
+                      return (
+                        <div key={`${chore.id}-${period}`} style={s.compactStepRow} onClick={() => toggle(person, chore, period)}>
+                          <div style={{ ...s.compactStepCircle, ...(done ? s.compactStepCircleDone : {}) }}>{done && <Icon name="check" size={13} />}</div>
+                          <span style={s.compactEmoji}>{chore.emoji}</span>
+                          <span style={{ ...s.compactItemName, ...(done ? s.compactItemDone : {}) }}>{chore.name} <span style={{ color: 'var(--text-3)', fontSize: 11 }}>· {label}</span></span>
+                          <span style={s.compactItemStars}>{'⭐'.repeat(chore.stars || 1)}</span>
                         </div>
-                        <span style={s.compactEmoji}>{chore.emoji}</span>
-                        <span style={{ ...s.compactItemName, ...(chore.done ? s.compactItemDone : {}) }}>{chore.name}</span>
-                        <span style={s.compactItemStars}>{'⭐'.repeat(chore.stars || 1)}</span>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
-                  {person.chores.length > 4 && <div style={s.compactMore}>+{person.chores.length - 4} more</div>}
+                  {person.chores.flatMap(chore => chorePeriods(chore)).length > 12 && <div style={s.compactMore}>+{person.chores.flatMap(chore => chorePeriods(chore)).length - 12} more</div>}
                 </div>
               </div>
             </div>
@@ -293,8 +303,9 @@ export default function Chores({ compact = false }) {
   return (
     <div style={{ ...s.wrap, ...(isMobile ? s.wrapMobile : { gridTemplateColumns: `repeat(${columnCount}, 1fr)` }) }}>
       {visiblePeople.map(person => {
-        const done = person.chores.filter(c => c.done).length;
-        const total = person.chores.length;
+        const occurrences = person.chores.flatMap(chore => chorePeriods(chore).map(period => ({ chore, period })));
+        const done = occurrences.filter(({ chore, period }) => periodDone(chore, period)).length;
+        const total = occurrences.length;
         const pct = total ? (done / total) * 100 : 0;
         const color = personColors[person.id] || person.color;
         const isStarPerson = person.type === 'child' || person.id.startsWith('kid');
@@ -324,18 +335,24 @@ export default function Chores({ compact = false }) {
             </div>
 
             <div style={s.columnBody}>
-              <div style={s.choreList}>
-                {person.chores.map(chore => (
-                  <ChoreCard
-                    key={chore.id}
-                    chore={chore}
-                    color={color}
-                    isMobile={isMobile}
-                    onToggle={() => toggle(person, chore)}
-                    floatingStars={floatingStars.filter(f => f.choreId === chore.id)}
-                  />
-                ))}
-                {person.chores.length === 0 && <div style={s.emptySmall}>No chores yet</div>}
+              <div style={s.choreSections}>
+                {CHORE_PERIODS.map(period => {
+                  const sectionChores = person.chores.filter(chore => chorePeriods(chore).includes(period.id));
+                  const sectionDone = sectionChores.filter(chore => periodDone(chore, period.id)).length;
+                  return (
+                    <section key={period.id} style={s.periodSection}>
+                      <div style={s.periodHeader}><span>{period.emoji} {period.label}</span><span style={s.periodCount}>{sectionDone}/{sectionChores.length}</span></div>
+                      <div style={s.choreList}>
+                        {sectionChores.map(chore => {
+                          const done = periodDone(chore, period.id);
+                          const occurrence = { ...chore, done };
+                          return <ChoreCard key={`${chore.id}-${period.id}`} chore={occurrence} color={color} isMobile={isMobile} onToggle={() => toggle(person, chore, period.id)} floatingStars={floatingStars.filter(f => f.choreId === `${chore.id}-${period.id}`)} />;
+                        })}
+                        {sectionChores.length === 0 && <div style={s.emptySmall}>No {period.label.toLowerCase()} chores</div>}
+                      </div>
+                    </section>
+                  );
+                })}
               </div>
 
               {isStarPerson && (
@@ -574,6 +591,10 @@ const s = {
 
   columnBody: { flex: 1, overflowY: 'auto', padding: 10 },
   choreList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  choreSections: { display: 'flex', flexDirection: 'column', gap: 14 },
+  periodSection: { display: 'flex', flexDirection: 'column', gap: 7 },
+  periodHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, fontWeight: 800, color: 'var(--text-2)', padding: '2px 3px 4px', borderBottom: '1px solid var(--border)' },
+  periodCount: { fontSize: 11, color: 'var(--text-3)', fontWeight: 600 },
 
   choreCard: {
     display: 'flex', alignItems: 'center', gap: 11,
