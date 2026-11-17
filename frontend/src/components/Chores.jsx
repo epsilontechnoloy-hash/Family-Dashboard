@@ -359,7 +359,7 @@ export default function Chores({ compact = false }) {
                 <div style={s.rewardsBlock}>
                   <div style={s.rewardsTitle}>🎁 Rewards</div>
                   <div style={s.rewardsGrid}>
-                    {(person.rewards || []).map(reward => {
+                    {[...(person.rewards || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true })).map(reward => {
                       const canAfford = totalStars >= reward.starsRequired;
                       const needed = Math.max(0, reward.starsRequired - totalStars);
                       const rewardPct = reward.starsRequired ? Math.min(100, (totalStars / reward.starsRequired) * 100) : 0;

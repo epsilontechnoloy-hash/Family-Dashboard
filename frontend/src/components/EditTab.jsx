@@ -447,21 +447,54 @@ function GeneralEditor({ isMobile, onGeneralSettingsSaved }) {
   );
 }
 
-// Compact, dependency-free emoji picker used by chore emoji fields.
+// Expanded, dependency-free emoji picker used by chore and reward emoji fields.
 const CHORE_EMOJIS = [
-  '🛏️', '🧹', '🧺', '🧽', '🧼', '🪥', '🚿', '🧻', '🗑️', '♻️',
-  '🍽️', '🥣', '🍳', '🥕', '🛒', '🐶', '🐱', '🐔', '🐴', '🐾',
-  '🌱', '🌻', '🌳', '🍃', '🌿', '🚗', '🚲', '🧸', '🧩', '📚',
-  '✏️', '🎒', '🎨', '🎮', '📱', '💻', '⭐', '❤️', '🏠', '✨',
+  // Home, cleaning & laundry
+  '🛏️','🪑','🛋️','🧹','🧺','🧽','🧼','🪣','🧴','🧻','🗑️','♻️','🧯','🪠','🪟','🪞','🧤','🧦','👕','👖','👗','👟','🥿','🧥',
+  // Bathroom & personal care
+  '🪥','🦷','🧴','🧖','🛁','🚿','🧼','🪒','💈','🧻','🧺',
+  // Kitchen & food
+  '🍽️','🍴','🥄','🥣','🥢','🍳','🫖','☕','🧃','🥛','🍎','🍌','🍓','🍇','🍉','🥕','🥦','🌽','🥔','🍞','🥪','🧀','🍪','🧁','🍕','🍿','🛒',
+  // Pets & animals
+  '🐶','🐕','🐩','🐱','🐈','🐈‍⬛','🐰','🐹','🐭','🐦','🐔','🐣','🐴','🐮','🐷','🐸','🐢','🐠','🐟','🦋','🐝','🐞','🐾','🦴','🐕‍🦺',
+  // Yard, garden & outdoors
+  '🌱','🌿','☘️','🍀','🌻','🌼','🌷','🌹','🌳','🌲','🌴','🍃','🪴','🌵','🌞','🌈','🌧️','☀️','🌤️','⛅','🌙','⭐',
+  // School, reading & creativity
+  '📚','📖','📕','📗','📘','✏️','✂️','🖍️','🖌️','🎨','📝','📓','🎒','🔬','🧮','🧩','🧸','🪁','🎭','🎵','🎹',
+  // Play, movement & transport
+  '🎮','🕹️','⚽','🏀','🏈','⚾','🎾','🏐','🚲','🛴','🛹','🚗','🚙','🚌','🚜','🛝','🏊','🏃','🧘','🚶',
+  // Rewards, celebration & general
+  '⭐','🌟','✨','💫','🏆','🥇','🎖️','🎁','🎀','🎉','🎊','❤️','💖','💗','💝','👍','👏','🙌','😊','😎','🤩','🏠','🔑','📱','💻','🔋','💡','🔔','⏰','📅','💰','🪙','💎','🛠️','🔧','🧰','🧹','🧺',
 ];
 
 function EmojiPickerButton({ onSelect, label = 'Choose emoji' }) {
   const [open, setOpen] = useState(false);
+  const [popupStyle, setPopupStyle] = useState({});
+  const buttonRef = useRef(null);
+
+  function togglePicker() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect) {
+      const width = Math.min(360, window.innerWidth - 24);
+      const maxHeight = Math.min(420, window.innerHeight - 24);
+      const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+      const roomBelow = window.innerHeight - rect.bottom - 12;
+      const top = roomBelow >= 220 || roomBelow >= maxHeight ? rect.bottom + 6 : Math.max(12, rect.top - maxHeight - 6);
+      setPopupStyle({ left, top, width, maxHeight });
+    }
+    setOpen(true);
+  }
+
   return (
     <div style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen(value => !value)}
+        onClick={togglePicker}
         title={label}
         aria-label={label}
         aria-expanded={open}
@@ -470,13 +503,16 @@ function EmojiPickerButton({ onSelect, label = 'Choose emoji' }) {
         ☺️ ▾
       </button>
       {open && (
-        <div style={{ position: 'absolute', zIndex: 50, top: 'calc(100% + 6px)', left: 0, width: 224, padding: 9, display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 4, background: 'var(--surface)', border: '1px solid var(--border-md)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
-          {CHORE_EMOJIS.map(emoji => (
-            <button key={emoji} type="button" onClick={() => { onSelect(emoji); setOpen(false); }} title={emoji} style={{ border: 0, borderRadius: 6, background: 'var(--bg)', cursor: 'pointer', fontSize: 21, padding: '5px 2px', lineHeight: 1.2 }}>
-              {emoji}
-            </button>
-          ))}
-        </div>
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 999 }} />
+          <div style={{ position: 'fixed', zIndex: 1000, ...popupStyle, boxSizing: 'border-box', padding: 10, display: 'grid', gridTemplateColumns: 'repeat(8, minmax(0, 1fr))', gap: 5, overflowY: 'auto', overscrollBehavior: 'contain', background: 'var(--surface)', border: '1px solid var(--border-md)', borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.22)' }}>
+            {CHORE_EMOJIS.map((emoji, index) => (
+              <button key={`${emoji}-${index}`} type="button" onClick={() => { onSelect(emoji); setOpen(false); }} title={emoji} aria-label={`Choose ${emoji}`} style={{ minWidth: 0, aspectRatio: '1', border: 0, borderRadius: 7, background: 'var(--bg)', cursor: 'pointer', fontSize: 25, padding: 3, lineHeight: 1.2 }}>
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -1032,7 +1068,7 @@ function ChoresEditor({ isMobile }) {
               <div style={s.rewardEditor}>
                 <div style={s.rewardLabel}>Redeemable Rewards</div>
                 <div style={s.list}>
-                  {(person.rewards || []).map(reward => (
+                  {[...(person.rewards || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true })).map(reward => (
                     <div key={reward.id} style={s.row}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                         <span style={s.rowEmoji}>{reward.emoji}</span>
