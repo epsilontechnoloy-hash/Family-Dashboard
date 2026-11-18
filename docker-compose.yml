@@ -50,8 +50,8 @@ services:
       - TS_USERSPACE=true
       - TS_AUTH_ONCE=true
     volumes:
-      - tailscale-state:/var/lib/tailscale
-      - ./tailscale/serve.json:/config/serve.json:ro
+      - /srv/family-dashboard/tailscale/state:/var/lib/tailscale
+      - /srv/family-dashboard/tailscale:/config
     depends_on:
       - frontend
 
